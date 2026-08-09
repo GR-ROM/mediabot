@@ -1,0 +1,109 @@
+spring:
+  main:
+    banner-mode: off
+
+server:
+  # 8080 is taken on this machine by something else, and a bot that will not start is a worse
+  # default than an unusual port.
+  port: ${MEDIABOT_PORT:8099}
+
+logging:
+  level:
+    root: WARN
+    su.grinev.mediabot: INFO
+  pattern:
+    # Time and level kept: a log line without them cannot be correlated with anything,
+    # and these are the lines that explain a download that went wrong hours ago.
+    console: "%d{HH:mm:ss} %-5level %msg%n"
+
+mediabot:
+  llm:
+    # The same host photo-agent uses: nginx with basic auth in front of Ollama.
+    base-url: ${MEDIABOT_LLM_URL:http://192.168.1.104:11434/v1}
+    api-key: ${MEDIABOT_API_KEY:}
+    auth-header: ${MEDIABOT_AUTH_HEADER:}
+    # Only ever asked to turn one sentence into one JSON object, so a small one is plenty.
+    model: ${MEDIABOT_LLM_MODEL:granite4:tiny-h}
+    # A JobSpec is a hundred tokens. Anything longer than this is not an answer to the question.
+    max-tokens: 256
+    # Zero: this is a parser. Sampling variety in a parser is called a bug.
+    temperature: 0.0
+    timeout-seconds: 120
+    # Ask the server what it has before the first chat message does. The bot still starts
+    # if this fails to find the model — it only warns — but not if the host is unreachable.
+    preflight: true
+
+  telegram:
+    # Never a literal: this file is in git, and a token committed once is a token to be revoked.
+    # It comes from the environment, and deploy/.env is where the server keeps its copy.
+    token: ${MEDIABOT_TG_TOKEN:}
+    username: ${MEDIABOT_TG_USERNAME:}
+    base-url: ${MEDIABOT_TG_API:https://api.telegram.org}
+    # Nothing is uploaded any more — the file is served over a link — so this is only the guard
+    # that stops a job nobody could deliver. 2 GB is what a local telegram-bot-api would take.
+    max-upload-bytes: ${MEDIABOT_MAX_UPLOAD:2147483648}
+    # Small enough to hand over in the chat itself; anything above this leaves as a link. 50 MB is
+    # what the public Bot API accepts for an upload — a local telegram-bot-api takes 2 GB, and then
+    # this can be raised to match. Zero turns it off and everything becomes a link again.
+    send-file-under-bytes: ${MEDIABOT_SEND_FILE_UNDER:52428800}
+    # Who may administer the bot. Kept here and not in the database so that an empty table or one
+    # somebody emptied cannot lock you out of your own bot — this is the way back in.
+    owners: ${MEDIABOT_OWNERS:}
+    # Everybody else lives in the allowed_chats table and is added from the chat with /allow.
+    # This list is only a seed: it is written into the table once, when the table is empty, so
+    # nothing that used to work stops working. After that the table is the truth.
+    allowed-chats: ${MEDIABOT_ALLOWED_CHATS:}
+
+  media:
+    yt-dlp: ${MEDIABOT_YTDLP:./bin/yt-dlp.exe}
+    ffmpeg: ${MEDIABOT_FFMPEG:./bin/ffmpeg.exe}
+    work-dir: ./work
+    # Not a convenience list: the URL arrives in a chat message and the arguments around it
+    # come from a model, so this is the boundary. Subdomains are matched automatically.
+    allowed-hosts:
+      - youtube.com
+      - youtu.be
+      - instagram.com
+    # The ceiling on what anybody may ask for, by who is asking. A 39-minute 1080p re-encode is
+    # seven minutes of a two-core box; letting every guest queue one is how the bot stops answering
+    # for everyone else. Owners are trusted with their own hardware.
+    max-height: ${MEDIABOT_MAX_HEIGHT:720}
+    owner-max-height: ${MEDIABOT_OWNER_MAX_HEIGHT:2160}
+    probe-timeout-seconds: 60
+    download-timeout-seconds: 1800
+    # YouTube refuses most requests without cookies — "Sign in to confirm you're not a bot" —
+    # and there is no way around that other than giving yt-dlp a signed-in session. Export one
+    # with a cookies.txt browser extension and point this at the file.
+    # Reading straight from a browser profile is the other option, but a running Chromium keeps
+    # its cookie database locked, so on anything that stays up, use the file.
+    cookies-file: ${MEDIABOT_COOKIES:}
+    cookies-from-browser: ${MEDIABOT_COOKIES_BROWSER:}
+    # The other half of what YouTube needs. It hands out an "n challenge" that has to be
+    # executed, and with no runtime the formats come back empty — a warning, not an error, so
+    # it reads as "this video has nothing to download". Give it a path: yt-dlp looks on the
+    # PATH the process inherits, which on Windows is not the one your shell shows you.
+    #   node:C:\Users\you\.nvm\versions\node\v25.5.0\bin\node.exe
+    js-runtime: ${MEDIABOT_JS_RUNTIME:}
+
+  links:
+    # What the user will click, so it has to be an address their phone can reach — not localhost.
+    # The port here is the one the bot listens on above, unless something fronts it.
+    base-url: ${MEDIABOT_LINK_BASE:http://localhost:8099}
+    # Finished files are moved here, out of the per-job working directory.
+    dir: ./public
+    # How long a link keeps working. After this a scheduled pass marks the row EXPIRED — which is
+    # when the link stops answering — and a second pass deletes the files in batches.
+    ttl-hours: ${MEDIABOT_LINK_TTL:8}
+
+  jobs:
+    # Not disposable while anything is queued: this is what lets a restart say "your download
+    # was interrupted" instead of leaving somebody waiting for a file nothing is producing.
+    database-path: ./cache/jobs.db
+    # Two at once. Downloads are mostly network, but the muxing at the end is not, and this
+    # host shares its CPU with a model.
+    concurrency: 2
+    # Unfinished jobs one chat may hold at once. A graph can now be several files and several
+    # minutes of ffmpeg, so eight of them queued is already more than this host will get through
+    # quickly, and the ninth is somebody who has stopped reading the answers.
+    per-chat-limit: ${MEDIABOT_PER_CHAT_LIMIT:8}
+    retention-hours: 48

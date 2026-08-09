@@ -1,0 +1,10 @@
+build/
+.gradle/
+.idea/
+bin/
+cache/
+public/
+work/
+docs/
+*.md
+.git/

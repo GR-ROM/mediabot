@@ -1,0 +1,24 @@
+# Build output
+build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+
+# What the bot makes while it runs: the queue, the files it serves, the scratch it works in.
+cache/
+public/
+work/
+
+# The external binaries. Large, platform-specific, and the Docker image installs its own.
+bin/
+
+# Secrets. deploy/.env carries the bot token and belongs on the server, not here.
+.env
+*.env
+!*.env.example
+
+# Cookies for yt-dlp are a signed-in session in a text file.
+cookies.txt
