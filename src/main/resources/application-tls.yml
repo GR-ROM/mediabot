@@ -1,0 +1,23 @@
+# Serving the files over TLS, switched on by running with the "tls" profile.
+#
+# Kept in its own profile rather than behind an empty default: a bundle pointing at certificate
+# files that are not there fails at startup, and a laptop has no certificate. The server sets
+# SPRING_PROFILES_ACTIVE=tls and mounts the pair; nothing else changes.
+#
+# reload-on-update is the whole reason this is a bundle and not plain server.ssl.* — the
+# certificate is short-lived and renewed in place by whatever issued it, and a listener that read
+# it once at startup would go on presenting an expired one until somebody restarted the container.
+
+spring:
+  ssl:
+    bundle:
+      pem:
+        server:
+          reload-on-update: true
+          keystore:
+            certificate: ${MEDIABOT_TLS_CERT:/opt/keystore/server.crt}
+            private-key: ${MEDIABOT_TLS_KEY:/opt/keystore/server.key}
+
+server:
+  ssl:
+    bundle: server

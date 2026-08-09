@@ -9,8 +9,13 @@
 services:
   mediabot:
     build:
+      # The runtime-only image: the jar is built where there is memory to spare and staged here.
+      # Compiling in a container on this host is what took it down once — a JDK plus the Gradle
+      # cache does not fit beside the VPN in 1.8 GB.
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: deploy/Dockerfile.runtime
+      args:
+        JAR: deploy/app.jar
     image: mediabot:latest
     container_name: mediabot
     restart: unless-stopped
@@ -33,6 +38,8 @@ services:
       # commands without it; only free prose loses anything.
       MEDIABOT_LLM_URL: ${MEDIABOT_LLM_URL:-http://127.0.0.1:11434/v1}
       SPRING_MAIN_BANNER_MODE: "off"
+      # Empty means plain HTTP; "tls" turns on the listener that reads the pair mounted below.
+      SPRING_PROFILES_ACTIVE: ${MEDIABOT_PROFILES:-}
       MEDIABOT_LLM_PREFLIGHT: "false"
     volumes:
       # Bound to host directories rather than named volumes, so the served files and the queue
@@ -40,6 +47,9 @@ services:
       # container is thrown away and rebuilt.
       - ${MEDIABOT_DATA:-/opt/mediabot}/public:/app/public
       - ${MEDIABOT_DATA:-/opt/mediabot}/cache:/app/cache
+      # The certificate and key, read-only and shared with whatever renews them. Watched at
+      # runtime, so a renewal is picked up without restarting anything.
+      - ${MEDIABOT_TLS_DIR:-/opt/keystore}:/opt/keystore:ro
     logging:
       driver: json-file
       options:

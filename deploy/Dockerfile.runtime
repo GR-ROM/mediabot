@@ -1,0 +1,40 @@
+# The same image as Dockerfile produces, minus the part that builds the jar.
+#
+# For hosts that cannot afford a build: compiling in a container wants a JDK, the whole Gradle
+# cache and a gigabyte of headroom, and a small server does not have it — one such build took a
+# 1.8 GB box down by thrashing rather than by any single process being too large. Build the jar
+# where there is room, ship it, and let the server do nothing but copy:
+#
+#   ./gradlew bootJar
+#   docker build -f deploy/Dockerfile.runtime --build-arg JAR=build/libs/mediabot-0.1.0.jar .
+#
+# The build stage in Dockerfile is still the right thing on a machine with memory to spare.
+
+FROM eclipse-temurin:25-jre
+
+# Latest rather than pinned, deliberately. A pinned yt-dlp is reproducible right up until YouTube
+# changes something, and then it is simply broken. nodejs is here because YouTube hands out an "n
+# challenge" that has to be executed, and with no JS engine the format list comes back empty.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg nodejs ca-certificates curl \
+    && curl -fsSL -o /usr/local/bin/yt-dlp \
+       "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
+    && chmod +x /usr/local/bin/yt-dlp \
+    && apt-get purge -y curl && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ARG JAR
+COPY ${JAR} /app/app.jar
+
+RUN mkdir -p /app/work /app/public /app/cache
+VOLUME ["/app/public", "/app/cache"]
+
+ENV MEDIABOT_YTDLP=/usr/local/bin/yt-dlp \
+    MEDIABOT_FFMPEG=/usr/bin/ffmpeg \
+    MEDIABOT_JS_RUNTIME=node:/usr/bin/node \
+    MEDIABOT_PORT=8099
+ENV JAVA_TOOL_OPTIONS="-Xmx384m -XX:MaxMetaspaceSize=192m --enable-native-access=ALL-UNNAMED"
+
+EXPOSE 8099
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

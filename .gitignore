@@ -22,3 +22,6 @@ bin/
 
 # Cookies for yt-dlp are a signed-in session in a text file.
 cookies.txt
+
+# The jar staged for deploy/Dockerfile.runtime; built, not authored.
+deploy/app.jar
