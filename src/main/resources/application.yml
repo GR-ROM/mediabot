@@ -7,6 +7,24 @@ server:
   # default than an unusual port.
   port: ${MEDIABOT_PORT:8099}
 
+management:
+  server:
+    # Its own listener, not the one serving downloads: /actuator/prometheus on the public port
+    # would hand the internals to anybody who found the address. Published to loopback only.
+    port: ${MEDIABOT_ACTUATOR_PORT:8080}
+  endpoints:
+    web:
+      exposure:
+        # Just these two. Every other endpoint is a way to read or change something at runtime.
+        include: prometheus,health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: mediabot
+
 logging:
   level:
     root: WARN

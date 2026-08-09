@@ -29,6 +29,12 @@ dependencies {
     // download can be handed over at all: nothing goes through the Bot API's upload path.
     implementation("org.springframework.boot:spring-boot-starter-web")
 
+    // Observability. The JVM's own numbers — heap, GC, threads, code cache — plus whatever the
+    // application registers, on a port of their own so the public listener keeps serving files
+    // and nothing else.
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("io.micrometer:micrometer-registry-prometheus")
+
     // Compile-time annotation processor; nothing of it belongs on the runtime classpath.
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")

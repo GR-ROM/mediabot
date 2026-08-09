@@ -21,3 +21,11 @@ spring:
 server:
   ssl:
     bundle: server
+
+# The management listener does not inherit it. It is bound to loopback and scraped by a Prometheus
+# on the same host, so the certificate would buy nothing and cost a handshake — and without this
+# it inherits server.ssl and answers 400 to the plain HTTP that Prometheus speaks.
+management:
+  server:
+    ssl:
+      enabled: false

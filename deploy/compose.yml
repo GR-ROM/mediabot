@@ -25,6 +25,9 @@ services:
       # because long polling dials out. Only the published port moves; the application keeps its
       # own 8099 inside, and MEDIABOT_LINK_BASE is what has to agree with the outside one.
       - "${MEDIABOT_PUBLIC_PORT:-1488}:8099"
+      # Metrics, bound to loopback: Prometheus runs on the host and scrapes this, nobody else
+      # can reach it. The container keeps 8080 inside; the host side avoids the port myvpn holds.
+      - "127.0.0.1:${MEDIABOT_ACTUATOR_HOST_PORT:-9101}:8080"
     environment:
       MEDIABOT_LINK_BASE: ${MEDIABOT_LINK_BASE}
       MEDIABOT_TG_TOKEN: ${MEDIABOT_TG_TOKEN}
@@ -37,6 +40,11 @@ services:
       # every start and every unusual phrasing would wait for a timeout. The router reads the
       # commands without it; only free prose loses anything.
       MEDIABOT_LLM_URL: ${MEDIABOT_LLM_URL:-http://127.0.0.1:11434/v1}
+      # Measured, not guessed. Heap in use is ~50 MB, so 384 was six times what it needed and
+      # G1 was charging 38 MB of its own tables for the privilege — SerialGC brought that to
+      # 0.2 MB on a box with two cores where pause times matter to nobody. Metaspace used 7 MB
+      # against a 192 MB ceiling.
+      JAVA_TOOL_OPTIONS: "-Xmx160m -XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=64m --enable-native-access=ALL-UNNAMED"
       SPRING_MAIN_BANNER_MODE: "off"
       # Empty means plain HTTP; "tls" turns on the listener that reads the pair mounted below.
       SPRING_PROFILES_ACTIVE: ${MEDIABOT_PROFILES:-}
