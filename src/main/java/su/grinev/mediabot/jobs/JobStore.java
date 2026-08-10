@@ -107,6 +107,12 @@ public class JobStore {
                 if (!hasColumn(connection, "results_json")) {
                     s.execute("alter table jobs add column results_json blob");
                 }
+                // The fingerprint a repeated request is recognised by. Rows written before it
+                // existed have none and are simply never reused — which is the safe direction.
+                if (!hasColumn(connection, "origin")) {
+                    s.execute("alter table jobs add column origin text");
+                }
+                s.execute("create index if not exists jobs_origin on jobs(chat_id, origin)");
 
                 // Rows written before the states were named after what they mean. Done here rather
                 // than read leniently at every query, because a state nothing writes any more
@@ -130,8 +136,8 @@ public class JobStore {
         return database.call("cannot record the job", connection -> {
             try (PreparedStatement ps = connection.prepareStatement("""
                     insert into jobs (chat_id, kind, url, max_height, audio_format, state,
-                                      created_at, updated_at, title, spec_json)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, jsonb(?))""",
+                                      created_at, updated_at, title, spec_json, origin)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, jsonb(?), ?)""",
                     Statement.RETURN_GENERATED_KEYS)) {
                 long now = Instant.now().toEpochMilli();
                 ps.setLong(1, spec.chatId());
@@ -148,6 +154,7 @@ public class JobStore {
                 ps.setLong(8, now);
                 ps.setString(9, spec.title());
                 ps.setString(10, GraphJson.write(spec.graph()));
+                ps.setString(11, spec.origin());
                 ps.executeUpdate();
                 try (ResultSet keys = ps.getGeneratedKeys()) {
                     keys.next();
@@ -190,6 +197,39 @@ public class JobStore {
      * that asks again because the first answer did not sound final, means the same thing both
      * times — and the second download would deliver the same file at twice the cost.
      */
+    /**
+     * What makes a repeated request cost nothing.
+     *
+     * <p>Asked before anything is queued: a job in this chat with the same fingerprint that is
+     * either still running or finished with its files still around is the answer to the new
+     * request, and doing the work again would spend the bandwidth and the CPU twice to produce the
+     * same bytes.
+     *
+     * <p>Scoped to the chat because a link is minted for one, and handing another chat's link over
+     * would be handing over access to it. Failed and expired jobs are not reused: there is nothing
+     * to hand back, and refusing to retry would be worse than retrying.
+     */
+    public Optional<Job> findReusable(JobSpec spec) {
+        String origin = spec.origin();
+        if (origin == null || origin.isBlank()) {
+            return Optional.empty();
+        }
+        List<Job> candidates = query("select *, json(spec_json) as spec_text, "
+                + "json(results_json) as results_text from jobs "
+                + "where chat_id = ? and origin = ? "
+                + "and state in ('PENDING','DOWNLOADING','PROCESSING','DONE') "
+                + "order by id desc", spec.chatId(), origin);
+
+        for (Job job : candidates) {
+            // Finished with nothing to show for it is not something to hand back.
+            if (job.state() == JobState.DONE && job.results().isEmpty()) {
+                continue;
+            }
+            return Optional.of(job);
+        }
+        return Optional.empty();
+    }
+
     public Optional<Job> findPendingLike(JobSpec spec) {
         for (Job job : pendingIn(spec.chatId())) {
             if (job.kind() == spec.scenario() && job.url().equals(spec.url())

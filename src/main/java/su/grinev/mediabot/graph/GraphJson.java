@@ -73,8 +73,12 @@ public final class GraphJson {
                 json.put("format", audio.format().extension());
             }
             case Node.Concat concat -> {
+                // "ins", not "in": this is the one step that takes several, and a key that is a
+                // string everywhere else and an array here is a key a statically typed reader has
+                // to special-case. The Go port would not spell it that way, and both write into
+                // the same column.
                 json.put("op", "join");
-                ArrayNode inputs = json.putArray("in");
+                ArrayNode inputs = json.putArray("ins");
                 concat.inputs().forEach(inputs::add);
             }
             case Node.Publish publish -> {
@@ -118,8 +122,10 @@ public final class GraphJson {
             case "audio" -> new Node.Audio(id, json.path("in").asText(),
                     AudioFormat.named(json.path("format").asText()).orElse(AudioFormat.DEFAULT));
             case "join" -> {
+                // Rows written before the key was settled say "in"; they are still somebody's job.
+                JsonNode written = json.has("ins") ? json.path("ins") : json.path("in");
                 List<String> inputs = new ArrayList<>();
-                json.path("in").forEach(input -> inputs.add(input.asText()));
+                written.forEach(input -> inputs.add(input.asText()));
                 yield new Node.Concat(id, inputs);
             }
             case "publish" -> new Node.Publish(id, json.path("in").asText());

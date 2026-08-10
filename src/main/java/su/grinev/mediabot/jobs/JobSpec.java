@@ -1,5 +1,6 @@
 package su.grinev.mediabot.jobs;
 
+import su.grinev.mediabot.graph.Fingerprint;
 import su.grinev.mediabot.graph.Graph;
 import su.grinev.mediabot.graph.Node;
 import su.grinev.mediabot.graph.Pipeline;
@@ -153,6 +154,37 @@ public record JobSpec(long chatId, JobKind scenario, String url, Integer maxHeig
 
     public JobSpec withTitle(String probed) {
         return new JobSpec(chatId, scenario, url, maxHeight, audioFormat, probed, graph);
+    }
+
+    /**
+     * The fingerprint this job is deduped on: what work was asked for, and nothing about who asked
+     * or what the host later called it.
+     *
+     * <p>Taken from the whole graph rather than from the url, because the url is not the work. The
+     * same link at two heights is two files; the same link with a cut is a third; the same link
+     * with the cut normalised is a fourth. Every step and every parameter counts, and the graph is
+     * the only place that has all of them.
+     *
+     * <p>Hashed from {@link Fingerprint}, which is written out by hand, and not from the stored
+     * json. A fingerprint taken from the storage format changes whenever that format does — reorder
+     * one field and every row already deduped stops matching — and it never agreed with a second
+     * implementation of the same format.
+     *
+     * <p>A graph that cannot be written down has no fingerprint, and a job with no fingerprint is
+     * simply never deduped — it does the work again rather than handing back the wrong file.
+     */
+    public String origin() {
+        try {
+            byte[] sum = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(Fingerprint.of(graph).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(sum.length * 2);
+            for (byte b : sum) {
+                hex.append("%02x".formatted(b));
+            }
+            return hex.toString();
+        } catch (RuntimeException | java.security.NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 
     /** What was asked for, in the words a person would use. */

@@ -53,11 +53,15 @@ public class JobQueue {
      */
     public Job enqueue(JobSpec spec) throws Refused {
 
-        Optional<Job> existing = store.findPendingLike(spec);
+        // Asked of the fingerprint, not of the url: the same link at two heights is two files, and
+        // the same link with a cut is a third. What comes back is a job whose work is already done
+        // or under way, whether it finished a minute ago or is still downloading.
+        Optional<Job> existing = store.findReusable(spec);
         if (existing.isPresent()) {
-            log.info("chat {} asked again for something already queued as job {}",
-                    spec.chatId(), existing.get().id());
-            return existing.get();
+            Job reused = existing.get();
+            log.info("chat {} asked again for job {} ({}), which is {} — not doing it twice",
+                    spec.chatId(), reused.id(), reused.describe(), reused.state());
+            return reused;
         }
         int pending = store.pendingIn(spec.chatId()).size();
         if (pending >= perChatLimit) {
