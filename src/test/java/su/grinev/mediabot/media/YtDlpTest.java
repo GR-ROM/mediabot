@@ -41,14 +41,22 @@ class YtDlpTest {
     }
 
     @Test
-    void anUnrecognisedFailureFallsBackToItsLastLine() {
-        // yt-dlp puts the actual error last, after however much warning noise precedes it.
-        String explained = YtDlp.explain("""
-                WARNING: unable to extract something
+    void anUnrecognisedFailureIsNotRepeatedAtThePerson() {
+        String stderr = """
+                Traceback (most recent call last):
+                  File "yt_dlp/YoutubeDL.py", line 1234, in wrapper
                 WARNING: falling back
-                ERROR: unable to download webpage: timed out""");
+                ERROR: unable to download webpage: <urlopen error timed out>""";
 
-        assertEquals("ERROR: unable to download webpage: timed out", explained);
+        String explained = YtDlp.explain(stderr);
+
+        // This used to be the last line of stderr, handed to whoever sent the link. A traceback and
+        // a URL presented as an answer reads as the bot being broken rather than the video being
+        // unavailable — and the whole of it is in the log either way.
+        assertEquals(YtDlp.UNRECOGNISED, explained);
+        assertFalse(explained.contains("urlopen"), explained);
+        assertFalse(explained.contains("Traceback"), explained);
+        assertTrue(explained.length() < 80, "short enough to read in a chat: " + explained);
     }
 
     @Test

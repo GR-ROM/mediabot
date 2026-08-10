@@ -136,7 +136,7 @@ public record AgentProperties(
     public record Media(Path ytDlp, Path ffmpeg, Path workDir, List<String> allowedHosts,
                         int probeTimeoutSeconds, int downloadTimeoutSeconds,
                         Path cookiesFile, String cookiesFromBrowser, String jsRuntime,
-                        Path ytDlpPlugins, String potProvider,
+                        Path ytDlpPlugins, String potProvider, String canaryUrl,
                         int maxHeight, int ownerMaxHeight) {
 
         public Media {
@@ -157,6 +157,11 @@ public record AgentProperties(
             require(cookiesFile == null || cookiesFromBrowser == null
                             || cookiesFromBrowser.isBlank(),
                     "set either mediabot.media.cookies-file or cookies-from-browser, not both");
+            // The oldest video on YouTube: nineteen seconds, and it has been there since 2005. What
+            // the canary needs is something that will not be taken down and is cheap to ask about.
+            canaryUrl = canaryUrl == null || canaryUrl.isBlank()
+                    ? "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+                    : canaryUrl.strip();
         }
 
         public boolean hasJsRuntime() {

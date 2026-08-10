@@ -22,7 +22,8 @@ public class InMemoryYtDlp extends YtDlp {
     private List<PlaylistItem> entries = List.of();
 
     public InMemoryYtDlp() {
-        super(new ObjectMapper(), Fixtures.props());
+        // Nothing listens for a provider that stopped answering here; that is its own test.
+        super(new ObjectMapper(), Fixtures.props(), event -> { });
     }
 
     /** What a host publishes for one video: a stream per height, and one audio track beside them. */

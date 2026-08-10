@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LiveMediaTest {
 
     private final AgentProperties props = liveProps();
-    private final YtDlp ytDlp = new YtDlp(new ObjectMapper(), props);
+    private final YtDlp ytDlp = new YtDlp(new ObjectMapper(), props, event -> { });
     private final VideoDownloader downloader =
             new VideoDownloader(ytDlp, new Ffmpeg(props), new ProbeCache(ytDlp));
 
@@ -144,7 +144,7 @@ class LiveMediaTest {
                         // A live run can be pointed at a proof-of-origin provider the same way the
                         // server is, which is the way to try it without deploying:
                         //   -Dmediabot.plugins=... -Dmediabot.pot=http://localhost:4416
-                        pathProperty("mediabot.plugins"), System.getProperty("mediabot.pot", ""),
+                        pathProperty("mediabot.plugins"), System.getProperty("mediabot.pot", ""), null,
                         720, 2160),
                 new AgentProperties.Links("http://localhost:8080", Path.of("build/test-public"), 24),
                 new AgentProperties.Jobs(Path.of("build/live-jobs.db"), 1, 5, 24));

@@ -117,7 +117,7 @@ public final class Fixtures {
                     new AgentProperties.Telegram(token, "TestBot", "https://api.telegram.org",
                             maxUploadBytes, sendFileUnderBytes, owners, allowedChats),
                     new AgentProperties.Media(Path.of("yt-dlp"), ffmpeg, workDir,
-                            allowedHosts, 60, 600, null, null, null, plugins, potProvider,
+                            allowedHosts, 60, 600, null, null, null, plugins, potProvider, null,
                             maxHeight, ownerMaxHeight),
                     new AgentProperties.Links("http://test.local:1488", linksDir, ttlHours),
                     new AgentProperties.Jobs(database, 1, perChatLimit, 48));

@@ -106,6 +106,26 @@ class OwnerAlertsTest {
     }
 
     @Test
+    void aProviderThatStoppedAnsweringIsSaidBeforeAnybodyLosesADownload() {
+        alerts.onProviderUnreachable(new su.grinev.mediabot.media.ProviderUnreachable(
+                "[pot:bgutil:http] Error reaching GET http://potoken:4416/ping"));
+
+        assertTrue(bot.said().contains("about to start failing"), bot.said());
+        assertTrue(bot.said().contains("potoken:4416"), "the address it could not reach: " + bot.said());
+    }
+
+    @Test
+    void aBrokenProviderIsOneMessageHoweverManyPlacesNoticeIt() {
+        // The warning on a run that worked, the canary's hourly look and a job that actually failed
+        // are three ways of finding the same thing.
+        alerts.onProviderUnreachable(new su.grinev.mediabot.media.ProviderUnreachable("unreachable"));
+        alerts.onProviderUnreachable(new su.grinev.mediabot.media.ProviderUnreachable("unreachable"));
+        alerts.consider(failedWith(YtDlp.NEEDS_AUTHENTICATION));
+
+        assertEquals(2, bot.messages().size(), "one message per owner, not one per discovery");
+    }
+
+    @Test
     void aJobWithNothingToSayIsNotAnAlert() {
         alerts.consider(failedWith(null));
         alerts.consider(null);

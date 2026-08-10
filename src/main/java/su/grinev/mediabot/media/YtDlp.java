@@ -32,6 +32,9 @@ public class YtDlp {
 
     private static final Pattern PROGRESS = Pattern.compile("\\[download]\\s+(\\d+\\.?\\d*)%");
 
+    /** Where a provider that has stopped answering is reported. Null in a test that has nobody. */
+    private final org.springframework.context.ApplicationEventPublisher events;
+
     private final ObjectMapper mapper;
     private final Path binary;
     private final Path ffmpeg;
@@ -51,7 +54,9 @@ public class YtDlp {
             "the host wants proof this is not a bot — it needs cookies from a signed-in "
                     + "account configured for yt-dlp";
 
-    public YtDlp(ObjectMapper mapper, AgentProperties props) {
+    public YtDlp(ObjectMapper mapper, AgentProperties props,
+                 org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.mapper = mapper;
         this.binary = props.media().ytDlp();
         this.ffmpeg = props.media().ffmpeg();
@@ -123,6 +128,41 @@ public class YtDlp {
     }
 
     /**
+     * The one place a run is judged, and the only place its output is repeated in full.
+     *
+     * <p>Two things happen here that used to happen nowhere. The whole of what the process said goes
+     * to the log, always, with the url beside it — that is what somebody reads afterwards, and
+     * pasting it into a chat instead is how a person is handed a traceback for an answer. And the
+     * plugin's own complaints are noticed: a proof-of-origin provider that has died says so in a
+     * warning on a run that otherwise succeeds, which is the only warning this bot gets before the
+     * downloads start failing days later.
+     *
+     * @throws Failed when the process failed, worded for a person
+     */
+    private void checked(ProcessRunner.Result result, String url) throws Failed {
+        String said = result.stderrText();
+        if (said.contains(POT_MARKER)) {
+            String detail = said.lines()
+                    .filter(line -> line.contains(POT_MARKER))
+                    .findFirst()
+                    .orElse(said);
+            log.warn("the proof-of-origin provider is not answering: {}", detail);
+            if (events != null) {
+                events.publishEvent(new ProviderUnreachable(detail));
+            }
+        }
+        if (result.exitCode() == 0) {
+            return;
+        }
+        // The whole thing, once, here. What the person gets is the sentence below it.
+        log.warn("yt-dlp failed on {}:{}{}", url, System.lineSeparator(), said);
+        throw new Failed(explain(said));
+    }
+
+    /** What the plugin prefixes its own complaints with, which is how they are told from the rest. */
+    private static final String POT_MARKER = "[pot:";
+
+    /**
      * What the host says about a video. Seconds, no bytes transferred.
      *
      * @param url already checked by {@link UrlGuard}
@@ -131,14 +171,11 @@ public class YtDlp {
         List<String> command = new ArrayList<>(List.of(
                 binary.toString(),
                 "--no-playlist",
-                "--no-warnings",
                 "-J"));
         withAccess(command);
         command.add(url);
         var result = ProcessRunner.run(command, probeTimeout);
-        if (result.exitCode() != 0) {
-            throw new Failed(explain(result.stderrText()));
-        }
+        checked(result, url);
         return parse(mapper.readTree(result.stdoutText()));
     }
 
@@ -154,7 +191,6 @@ public class YtDlp {
         List<String> command = new ArrayList<>(List.of(
                 binary.toString(),
                 "--no-playlist",
-                "--no-warnings",
                 "--newline",          // progress on its own lines rather than redrawn in place
                 "--no-part",          // no .part file left behind when something goes wrong
                 "--windows-filenames",
@@ -173,7 +209,7 @@ public class YtDlp {
         withAccess(command);
         command.add(url);
 
-        return runAndCollect(command, intoDirectory, progress);
+        return runAndCollect(command, url, intoDirectory, progress);
     }
 
     public Path downloadFormat(String url, String formatId, Path target, DoubleConsumer progress)
@@ -182,7 +218,6 @@ public class YtDlp {
         List<String> command = new ArrayList<>(List.of(
                 binary.toString(),
                 "--no-playlist",
-                "--no-warnings",
                 "--newline",
                 "--no-part",
                 "--match-filter", "!is_live",
@@ -193,14 +228,17 @@ public class YtDlp {
 
         var result = ProcessRunner.run(command, downloadTimeout,
                 line -> reportProgress(line, progress));
-        if (result.exitCode() != 0) {
+        try {
+            checked(result, url);
+        } catch (IOException e) {
             deleteQuietly(target);
-            throw new Failed(explain(result.stderrText()));
+            throw e;
         }
         if (!Files.isRegularFile(target) || Files.size(target) == 0) {
             deleteQuietly(target);
-            throw new Failed("yt-dlp reported success but stream " + formatId
-                    + " produced no file — " + explain(result.stderrText()));
+            log.warn("yt-dlp reported success on {} but stream {} produced no file:{}{}",
+                    url, formatId, System.lineSeparator(), result.stderrText());
+            throw new Failed("the download finished without producing a file");
         }
         return target;
     }
@@ -217,7 +255,6 @@ public class YtDlp {
         List<String> command = new ArrayList<>(List.of(
                 binary.toString(),
                 "--no-playlist",
-                "--no-warnings",
                 "--newline",
                 "--no-part",
                 "--windows-filenames",
@@ -238,9 +275,7 @@ public class YtDlp {
             }
             reportProgress(line, extracting.get() ? progress::processing : progress::downloading);
         });
-        if (result.exitCode() != 0) {
-            throw new Failed(explain(result.stderrText()));
-        }
+        checked(result, url);
         return newestFile(intoDirectory, result);
     }
 
@@ -255,15 +290,12 @@ public class YtDlp {
         List<String> command = new ArrayList<>(List.of(
                 binary.toString(),
                 "--flat-playlist",
-                "--no-warnings",
                 "-J",
                 "--playlist-end", String.valueOf(Math.max(1, limit))));
         withAccess(command);
         command.add(url);
         var result = ProcessRunner.run(command, probeTimeout);
-        if (result.exitCode() != 0) {
-            throw new Failed(explain(result.stderrText()));
-        }
+        checked(result, url);
         JsonNode root = mapper.readTree(result.stdoutText());
         List<PlaylistItem> items = new ArrayList<>();
         int index = 1;
@@ -284,14 +316,13 @@ public class YtDlp {
     /** @param index position in the playlist, 1-based, as a person would count them */
     public record PlaylistItem(int index, String title, String url, int durationSeconds) {}
 
-    private Path runAndCollect(List<String> command, Path intoDirectory, DoubleConsumer progress)
+    private Path runAndCollect(List<String> command, String url, Path intoDirectory,
+                               DoubleConsumer progress)
             throws IOException, InterruptedException {
 
         var result = ProcessRunner.run(command, downloadTimeout,
                 line -> reportProgress(line, progress));
-        if (result.exitCode() != 0) {
-            throw new Failed(explain(result.stderrText()));
-        }
+        checked(result, url);
         return newestFile(intoDirectory, result);
     }
 
@@ -434,9 +465,13 @@ public class YtDlp {
         if (lower.contains("ffmpeg") && lower.contains("not found")) {
             return "ffmpeg was not found, and it is needed to join the video and audio streams";
         }
-        // Nothing recognised: the last line is where yt-dlp puts the actual error.
-        String[] lines = stderr.strip().split("\n");
-        String last = lines.length == 0 ? "" : lines[lines.length - 1].strip();
-        return last.isBlank() ? "yt-dlp exited with an error" : last;
+        // Nothing recognised. What used to happen here was the last line of stderr, handed to
+        // whoever sent the link — which is a traceback, a URL and a stack of warnings presented as
+        // an answer, and reads as the bot being broken rather than the video being unavailable. The
+        // whole of it is in the log; this is the part a person gets.
+        return UNRECOGNISED;
     }
+
+    /** What is said when the reason is not one of the ones worth naming. */
+    public static final String UNRECOGNISED = "the download failed — I have written down why";
 }
