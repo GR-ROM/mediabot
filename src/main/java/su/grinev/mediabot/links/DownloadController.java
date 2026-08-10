@@ -71,8 +71,11 @@ public class DownloadController {
             range = null;
         }
         if (range == null) {
+            // Carried on the headers this answer is actually built from. Set on the other set and
+            // dropped, a 416 arrives without the one field it exists to deliver — the length a
+            // player needs to ask again with a range that fits.
             headers.set(HttpHeaders.CONTENT_RANGE, "bytes */" + total);
-            return text(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, "Unreadable range.");
+            return text(headers, HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, "Unreadable range.");
         }
 
         long start = range.getRangeStart(total);
@@ -105,7 +108,11 @@ public class DownloadController {
     }
 
     private static ResponseEntity<StreamingResponseBody> text(HttpStatus status, String message) {
-        HttpHeaders headers = new HttpHeaders();
+        return text(new HttpHeaders(), status, message);
+    }
+
+    private static ResponseEntity<StreamingResponseBody> text(HttpHeaders headers, HttpStatus status,
+                                                              String message) {
         headers.setContentType(MediaType.TEXT_PLAIN);
         byte[] body = message.getBytes(StandardCharsets.UTF_8);
         headers.setContentLength(body.length);
