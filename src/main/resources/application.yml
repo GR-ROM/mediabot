@@ -119,6 +119,15 @@ mediabot:
     # PATH the process inherits, which on Windows is not the one your shell shows you.
     #   node:C:\Users\you\.nvm\versions\node\v25.5.0\bin\node.exe
     js-runtime: ${MEDIABOT_JS_RUNTIME:}
+    # Where proof-of-origin tokens come from, and the answer to the cookies problem rather than a
+    # companion to it. YouTube's "Sign in to confirm you're not a bot" is not really about signing
+    # in: it wants a token produced by running its own JavaScript, and cookies from a real account
+    # are only a way of not being asked. A provider mints one per request — no account, nothing to
+    # export, nothing that rots. deploy/compose.yml runs one beside the bot.
+    pot-provider: ${MEDIABOT_POT_PROVIDER:}
+    # The directory the provider's yt-dlp plugin lives in. Named explicitly because the default
+    # plugin locations differ between an installed yt-dlp and the standalone binary the image uses.
+    yt-dlp-plugins: ${MEDIABOT_YTDLP_PLUGINS:}
 
   links:
     # What the user will click, so it has to be an address their phone can reach — not localhost.

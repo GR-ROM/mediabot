@@ -49,6 +49,11 @@ services:
       # Empty means plain HTTP; "tls" turns on the listener that reads the pair mounted below.
       SPRING_PROFILES_ACTIVE: ${MEDIABOT_PROFILES:-}
       MEDIABOT_LLM_PREFLIGHT: "false"
+      # Where the proof-of-origin tokens come from. Reachable only on the compose network, so
+      # nothing outside can ask it for one.
+      MEDIABOT_POT_PROVIDER: ${MEDIABOT_POT_PROVIDER:-http://potoken:4416}
+    depends_on:
+      - potoken
     volumes:
       # Bound to host directories rather than named volumes, so the served files and the queue
       # are ordinary paths on the box: visible with ls, copied with cp, and still there when the
@@ -63,3 +68,26 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # The proof-of-origin token provider.
+  #
+  # YouTube wants a token produced by running its own JavaScript, and refuses to a bare request with
+  # "Sign in to confirm you're not a bot" — which is not really about signing in, and which cookies
+  # from a real account only work around until they rot. This produces the token instead: no
+  # account, nothing to export, nothing to refresh.
+  #
+  # No published port. It answers the bot over the compose network and nobody else needs it.
+  potoken:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    container_name: mediabot-potoken
+    restart: unless-stopped
+    expose:
+      - "4416"
+    # It runs a headless browser engine to execute the challenge, which on a 1.8 GB box beside a
+    # JVM and a VPN is worth bounding rather than trusting.
+    mem_limit: 400m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

@@ -40,6 +40,16 @@ public class YtDlp {
     private final Path cookiesFile;
     private final String cookiesFromBrowser;
     private final String jsRuntime;
+    private final Path plugins;
+    private final String potProvider;
+
+    /**
+     * The one failure the owner has to do something about, so it is named once and matched on that
+     * name rather than on a phrase repeated in two places.
+     */
+    public static final String NEEDS_AUTHENTICATION =
+            "the host wants proof this is not a bot — it needs cookies from a signed-in "
+                    + "account configured for yt-dlp";
 
     public YtDlp(ObjectMapper mapper, AgentProperties props) {
         this.mapper = mapper;
@@ -50,9 +60,14 @@ public class YtDlp {
         this.cookiesFile = props.media().cookiesFile();
         this.cookiesFromBrowser = props.media().cookiesFromBrowser();
         this.jsRuntime = props.media().jsRuntime();
-        if (!props.media().hasCookies()) {
-            log.warn("no cookies configured — YouTube will refuse most videos with \"Sign in to "
-                    + "confirm you're not a bot\". Set mediabot.media.cookies-file.");
+        this.plugins = props.media().ytDlpPlugins();
+        this.potProvider = props.media().potProvider();
+        if (props.media().hasPotProvider()) {
+            log.info("proof-of-origin tokens from {}", potProvider);
+        } else if (!props.media().hasCookies()) {
+            log.warn("no proof-of-origin provider and no cookies — YouTube will refuse most videos "
+                    + "with \"Sign in to confirm you're not a bot\". Set mediabot.media.pot-provider, "
+                    + "which needs no account, or mediabot.media.cookies-file, which does.");
         }
         if (!props.media().hasJsRuntime()) {
             log.warn("no JS runtime configured — YouTube hands out an \"n challenge\" that has to "
@@ -85,6 +100,18 @@ public class YtDlp {
             // which on Windows is not the one a shell shows you. "node:<path>" always works.
             command.add("--js-runtimes");
             command.add(jsRuntime);
+        }
+        // The proof-of-origin token, which is what makes an account unnecessary. Named explicitly
+        // rather than left to the default plugin directories: those differ between an installed
+        // yt-dlp and the standalone binary this runs, and a plugin that silently is not loaded
+        // looks exactly like one that does not work.
+        if (plugins != null) {
+            command.add("--plugin-dirs");
+            command.add(plugins.toString());
+        }
+        if (potProvider != null && !potProvider.isBlank()) {
+            command.add("--extractor-args");
+            command.add("youtubepot-bgutilhttp:base_url=" + potProvider.strip());
         }
     }
 
@@ -372,8 +399,7 @@ public class YtDlp {
     static String explain(String stderr) {
         String lower = stderr.toLowerCase(Locale.ROOT);
         if (lower.contains("sign in to confirm") || lower.contains("confirm you're not a bot")) {
-            return "the host wants proof this is not a bot — it needs cookies from a signed-in "
-                    + "account configured for yt-dlp";
+            return NEEDS_AUTHENTICATION;
         }
         if (lower.contains("private video") || lower.contains("this video is private")) {
             return "the video is private — no downloader can get it";

@@ -129,13 +129,23 @@ class LiveMediaTest {
         }
     }
 
+    private static Path pathProperty(String name) {
+        String written = System.getProperty(name, "");
+        return written.isBlank() ? null : Path.of(written);
+    }
+
     private static AgentProperties liveProps() {
         return new AgentProperties(
                 new AgentProperties.Llm("http://localhost/v1", "", "", "m", 1024, 0.1, 30, false),
                 new AgentProperties.Telegram("", "", "", 50L * 1024 * 1024, 0, List.of(), List.of()),
                 new AgentProperties.Media(Path.of("bin/yt-dlp.exe"), Path.of("bin/ffmpeg.exe"),
                         Path.of("build/live-work"),
-                        List.of("youtube.com", "youtu.be", "instagram.com", "rutube.ru", "commondatastorage.googleapis.com"), 60, 600, cookiesFile(), null, System.getProperty("mediabot.js", ""), 720, 2160),
+                        List.of("youtube.com", "youtu.be", "instagram.com", "rutube.ru", "commondatastorage.googleapis.com"), 60, 600, cookiesFile(), null, System.getProperty("mediabot.js", ""),
+                        // A live run can be pointed at a proof-of-origin provider the same way the
+                        // server is, which is the way to try it without deploying:
+                        //   -Dmediabot.plugins=... -Dmediabot.pot=http://localhost:4416
+                        pathProperty("mediabot.plugins"), System.getProperty("mediabot.pot", ""),
+                        720, 2160),
                 new AgentProperties.Links("http://localhost:8080", Path.of("build/test-public"), 24),
                 new AgentProperties.Jobs(Path.of("build/live-jobs.db"), 1, 5, 24));
     }

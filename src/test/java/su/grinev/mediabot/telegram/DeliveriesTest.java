@@ -41,7 +41,7 @@ class DeliveriesTest {
     private final ShortLinkService shortLinks = mock(ShortLinkService.class);
     private final Deliveries deliveries =
             new Deliveries(bot, shortLinks, Fixtures.builder()
-                    .uploads(50L * 1024 * 1024, 2L * 1024 * 1024 * 1024).build());
+                    .uploads(50L * 1024 * 1024, 2L * 1024 * 1024 * 1024).build(), alerts());
 
     /**
      * The result path is what says "there is something to hand over"; how many files there turn out
@@ -56,6 +56,14 @@ class DeliveriesTest {
 
     private static Job job(JobState state, long sizeBytes) {
         return job(state, sizeBytes, null);
+    }
+
+    /**
+     * Alerting the owner is its own subject, and its own test. Here it only has to exist, so a
+     * failure that would reach it does not reach a null instead.
+     */
+    private static OwnerAlerts alerts() {
+        return mock(OwnerAlerts.class);
     }
 
     private static ShortLink link(String code, String name, long sizeBytes) {

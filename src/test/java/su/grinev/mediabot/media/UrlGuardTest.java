@@ -2,6 +2,7 @@ package su.grinev.mediabot.media;
 
 import org.junit.jupiter.api.Test;
 import su.grinev.mediabot.AgentProperties;
+import su.grinev.mediabot.Fixtures;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -68,13 +69,6 @@ class UrlGuardTest {
     }
 
     private static AgentProperties propsAllowing(String... hosts) {
-        return new AgentProperties(
-                new AgentProperties.Llm("http://localhost:11434/v1", "", "", "m",
-                        1024, 0.1, 60, false),
-                new AgentProperties.Telegram("", "", "", 50L * 1024 * 1024, 0, List.of(), List.of()),
-                new AgentProperties.Media(Path.of("yt-dlp"), Path.of("ffmpeg"), Path.of("work"),
-                        List.of(hosts), 60, 600, null, null, null, 720, 2160),
-                new AgentProperties.Links("http://localhost:8080", Path.of("build/test-public"), 24),
-                new AgentProperties.Jobs(Path.of("jobs.db"), 1, 5, 24));
+        return Fixtures.builder().allowedHosts(hosts).build();
     }
 }

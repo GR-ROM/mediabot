@@ -136,6 +136,7 @@ public record AgentProperties(
     public record Media(Path ytDlp, Path ffmpeg, Path workDir, List<String> allowedHosts,
                         int probeTimeoutSeconds, int downloadTimeoutSeconds,
                         Path cookiesFile, String cookiesFromBrowser, String jsRuntime,
+                        Path ytDlpPlugins, String potProvider,
                         int maxHeight, int ownerMaxHeight) {
 
         public Media {
@@ -160,6 +161,22 @@ public record AgentProperties(
 
         public boolean hasJsRuntime() {
             return jsRuntime != null && !jsRuntime.isBlank();
+        }
+
+        /**
+         * Whether a proof-of-origin provider is configured.
+         *
+         * <p>This is the thing that answers YouTube's "Sign in to confirm you're not a bot" without
+         * an account: the token it wants is produced by running its own JavaScript, and a service
+         * beside the bot does that. Cookies are the fallback when there is no provider, and they
+         * rot; a token is minted per request and never has to be refreshed.
+         */
+        public boolean hasPotProvider() {
+            return potProvider != null && !potProvider.isBlank();
+        }
+
+        public boolean hasPlugins() {
+            return ytDlpPlugins != null;
         }
 
         /** Whether anything at all is configured to authenticate with. */

@@ -75,7 +75,7 @@ class ChatDispatcherTest {
         private IOException failWith;
 
         RecordingDeliveries(MediaBot bot, AgentProperties props) {
-            super(bot, mock(ShortLinkService.class), props);
+            super(bot, mock(ShortLinkService.class), props, mock(OwnerAlerts.class));
         }
 
         @Override

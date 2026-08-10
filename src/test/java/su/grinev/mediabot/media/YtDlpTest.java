@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The pure parts: what gets asked of yt-dlp, and what its failures are turned into. */
@@ -54,5 +55,15 @@ class YtDlpTest {
     void anEmptyFailureStillSaysSomething() {
         assertFalse(YtDlp.explain("").isBlank(),
                 "a blank explanation reads to the user as the bot having nothing to say");
+    }
+
+    @Test
+    void theBotCheckIsNamedOnceSoItCanBeRecognisedElsewhere() {
+        // OwnerAlerts matches on this to decide whether a failure is the owner's to fix. Matched on
+        // the constant rather than on the sentence, so the two cannot drift apart.
+        assertEquals(YtDlp.NEEDS_AUTHENTICATION,
+                YtDlp.explain("ERROR: Sign in to confirm you're not a bot"));
+        assertNotEquals(YtDlp.NEEDS_AUTHENTICATION,
+                YtDlp.explain("ERROR: Private video. Sign in if you've been granted access"));
     }
 }

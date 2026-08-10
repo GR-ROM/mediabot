@@ -38,6 +38,15 @@ public final class Fixtures {
         private int perChatLimit = 8;
         private int ttlHours = 1;
         private String token = "";
+        private Path plugins = null;
+        private String potProvider = null;
+
+        /** The proof-of-origin provider, which is what makes an account unnecessary. */
+        public Builder potProvider(String url, Path pluginDir) {
+            this.potProvider = url;
+            this.plugins = pluginDir;
+            return this;
+        }
 
         public Builder allowedHosts(String... hosts) {
             this.allowedHosts = List.of(hosts);
@@ -108,7 +117,8 @@ public final class Fixtures {
                     new AgentProperties.Telegram(token, "TestBot", "https://api.telegram.org",
                             maxUploadBytes, sendFileUnderBytes, owners, allowedChats),
                     new AgentProperties.Media(Path.of("yt-dlp"), ffmpeg, workDir,
-                            allowedHosts, 60, 600, null, null, null, maxHeight, ownerMaxHeight),
+                            allowedHosts, 60, 600, null, null, null, plugins, potProvider,
+                            maxHeight, ownerMaxHeight),
                     new AgentProperties.Links("http://test.local:1488", linksDir, ttlHours),
                     new AgentProperties.Jobs(database, 1, perChatLimit, 48));
         }

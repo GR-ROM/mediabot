@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import su.grinev.mediabot.AgentProperties;
+import su.grinev.mediabot.Fixtures;
 import su.grinev.mediabot.db.Database;
 
 import java.nio.file.Path;
@@ -100,13 +101,12 @@ class AccessListTest {
     }
 
     private AccessList listWith(List<Long> owners, List<Long> seed) {
-        AgentProperties props = mock(AgentProperties.class);
-        when(props.telegram()).thenReturn(new AgentProperties.Telegram(
-                "t", "bot", "https://api.telegram.org", 1024, 0, owners, seed));
-        when(props.media()).thenReturn(new AgentProperties.Media(
-                Path.of("yt-dlp"), Path.of("ffmpeg"), Path.of("work"), List.of("youtube.com"),
-                60, 1800, null, null, null, 720, 2160));
-        AccessList access = new AccessList(database, props);
+        // The real configuration rather than a mocked one: these records check themselves in their
+        // constructors, and a stub would let this pass on a combination the bot refuses to start on.
+        AccessList access = new AccessList(database, Fixtures.builder()
+                .owners(owners.toArray(Long[]::new))
+                .allowedChats(seed.toArray(Long[]::new))
+                .build());
         access.createTable();
         return access;
     }

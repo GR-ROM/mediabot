@@ -30,11 +30,14 @@ public class Deliveries {
     private final MediaBot bot;
     private final ShortLinkService shortLinks;
     private final AgentProperties props;
+    private final OwnerAlerts alerts;
 
-    public Deliveries(MediaBot bot, ShortLinkService shortLinks, AgentProperties props) {
+    public Deliveries(MediaBot bot, ShortLinkService shortLinks, AgentProperties props,
+                      OwnerAlerts alerts) {
         this.bot = bot;
         this.shortLinks = shortLinks;
         this.props = props;
+        this.alerts = alerts;
     }
 
     /**
@@ -53,8 +56,14 @@ public class Deliveries {
                     + "over, so it was not published. Ask for a smaller height.")
                     .formatted(job.describe(), Sizes.bytes(job.sizeBytes()),
                             Sizes.bytes(props.telegram().maxUploadBytes())));
-            case FAILED -> bot.say(job.chatId(),
-                    "%s failed: %s.".formatted(job.describe(), job.error()));
+            case FAILED -> {
+                bot.say(job.chatId(), "%s failed: %s.".formatted(job.describe(), job.error()));
+                // Some failures are the owner's to fix and nobody else's. The person who sent the
+                // link has already been told what happened; this is for whoever can act on it.
+                if (alerts != null) {
+                    alerts.consider(job);
+                }
+            }
             case INTERRUPTED -> bot.say(job.chatId(), ("Job %d (%s) was interrupted when the bot "
                     + "restarted. Send the link again if you still want it.")
                     .formatted(job.id(), job.describe()));

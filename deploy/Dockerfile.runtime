@@ -20,6 +20,17 @@ RUN apt-get update \
     && curl -fsSL -o /usr/local/bin/yt-dlp \
        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
     && chmod +x /usr/local/bin/yt-dlp \
+    # The proof-of-origin plugin. YouTube hands out a token that has to be produced by running its
+    # own JavaScript, and without one it falls back to asking for a signed-in account — the "Sign in
+    # to confirm you're not a bot" that no amount of retrying gets past. The plugin fetches tokens
+    # from the provider service beside this container; nothing here needs an account, and there is
+    # nothing to keep refreshing.
+    #
+    # A directory of its own, named on the command line, because the default plugin locations differ
+    # between an installed yt-dlp and this standalone binary.
+    && mkdir -p /opt/yt-dlp-plugins \
+    && curl -fsSL -o /opt/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip \
+       "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/latest/download/bgutil-ytdlp-pot-provider.zip" \
     && apt-get purge -y curl && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
@@ -33,6 +44,7 @@ VOLUME ["/app/public", "/app/cache"]
 ENV MEDIABOT_YTDLP=/usr/local/bin/yt-dlp \
     MEDIABOT_FFMPEG=/usr/bin/ffmpeg \
     MEDIABOT_JS_RUNTIME=node:/usr/bin/node \
+    MEDIABOT_YTDLP_PLUGINS=/opt/yt-dlp-plugins \
     MEDIABOT_PORT=8099
 ENV JAVA_TOOL_OPTIONS="-Xmx384m -XX:MaxMetaspaceSize=192m --enable-native-access=ALL-UNNAMED"
 
