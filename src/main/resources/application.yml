@@ -57,9 +57,15 @@ mediabot:
     token: ${MEDIABOT_TG_TOKEN:}
     username: ${MEDIABOT_TG_USERNAME:}
     base-url: ${MEDIABOT_TG_API:https://api.telegram.org}
-    # Nothing is uploaded any more — the file is served over a link — so this is only the guard
-    # that stops a job nobody could deliver. 2 GB is what a local telegram-bot-api would take.
-    max-upload-bytes: ${MEDIABOT_MAX_UPLOAD:2147483648}
+    # The largest single file the bot will hand over. Nothing is uploaded any more — the file is
+    # served over a link — so this stopped being the Bot API's 2 GB and became a question about the
+    # disk: two workers, a file that briefly exists as separate streams plus the merged result, and
+    # an hour of finished ones waiting to be collected. 4 GB of that fits in the 35 GB the server
+    # has spare; much more would not.
+    #
+    # Counted per file and not per job: two cuts that each fit are deliverable however much they
+    # weigh together, because they leave as two links.
+    max-upload-bytes: ${MEDIABOT_MAX_UPLOAD:4294967296}
     # Small enough to hand over in the chat itself; anything above this leaves as a link. 50 MB is
     # what the public Bot API accepts for an upload — a local telegram-bot-api takes 2 GB, and then
     # this can be raised to match. Zero turns it off and everything becomes a link again.
