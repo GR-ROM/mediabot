@@ -33,7 +33,7 @@ class PerChatLimitTest {
 
     @BeforeEach
     void open(@TempDir Path directory) throws Exception {
-        database = Database.at(directory.resolve("jobs.db"));
+        database = Database.inMemory();
         store = JobStore.on(database, 48);
         queue = new JobQueue(store, mock(JobWorkers.class), mock(MediaStore.class),
                 properties(directory));

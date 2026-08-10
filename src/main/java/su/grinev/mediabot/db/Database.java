@@ -42,6 +42,7 @@ public class Database {
     private static final int BUSY_TIMEOUT_MS = 5_000;
 
     private final Path path;
+    private final String url;
     private final ReentrantLock lock = new ReentrantLock();
     private Connection connection;
 
@@ -56,11 +57,32 @@ public class Database {
 
     private Database(Path path) {
         this.path = path;
+        this.url = "jdbc:sqlite:" + path;
+    }
+
+    private Database(String url) {
+        this.path = null;
+        this.url = url;
     }
 
     /** A database on a given file, already open, for a test that wants one without a context. */
     public static Database at(Path file) throws SQLException, IOException {
         Database database = new Database(file);
+        database.open();
+        return database;
+    }
+
+    /**
+     * A database that lives in this process and goes when it does.
+     *
+     * <p>For tests, and it is the right shape for them rather than merely the faster one: SQLite's
+     * in-memory database belongs to a single connection, and a single connection is exactly what
+     * this class already is. Everything below the connection — the schema, the transactions, the
+     * claim-once update — is the same code the deployed bot runs, which a mocked store would not
+     * have been.
+     */
+    public static Database inMemory() throws SQLException, IOException {
+        Database database = new Database("jdbc:sqlite::memory:");
         database.open();
         return database;
     }
@@ -73,20 +95,23 @@ public class Database {
 
     @PostConstruct
     public void open() throws SQLException, IOException {
-        Path parent = path.toAbsolutePath().getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
+        if (path != null) {
+            Path parent = path.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
         }
-        connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+        connection = DriverManager.getConnection(url);
         try (Statement s = connection.createStatement()) {
             // WAL so a reader asking "what is queued?" is not blocked by a worker writing progress.
+            // A no-op on an in-memory database, which has no file to journal to.
             s.execute("pragma journal_mode=WAL");
             s.execute("pragma synchronous=NORMAL");
             // Belt to the lock's braces: another process holding the file — a sqlite3 shell, a
             // backup — is not something this one can serialise with.
             s.execute("pragma busy_timeout=" + BUSY_TIMEOUT_MS);
         }
-        log.info("database at {}", path.toAbsolutePath());
+        log.info("database at {}", path == null ? "memory" : path.toAbsolutePath());
     }
 
     @PreDestroy

@@ -30,12 +30,13 @@ class AccessListTest {
     private static final long STRANGER = 333;
 
     private Database database;
-    private Path file;
 
     @BeforeEach
-    void open(@TempDir Path directory) throws Exception {
-        file = directory.resolve("jobs.db");
-        database = Database.at(file);
+    void open() throws Exception {
+        // In memory: the table is what these are about, and it belongs to this one connection —
+        // which is what Database already is. Nothing here outlives the test, including the file it
+        // used to leave behind.
+        database = Database.inMemory();
     }
 
     @AfterEach
