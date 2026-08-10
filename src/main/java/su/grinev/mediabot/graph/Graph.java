@@ -1,11 +1,7 @@
 package su.grinev.mediabot.graph;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -16,9 +12,18 @@ import java.util.Set;
  * own encode on each, a link per result. A list cannot say what is whose input, and the answer to
  * that question is the whole of the difference.
  *
- * <p>Checked here, once, on construction — ids unique, every input resolving to a node, no cycle,
- * something to publish at the end. Everything downstream may then assume it is walking a graph that
- * makes sense.
+ * <p>Checked here, once, on construction — ids unique, every input resolving to a node that comes
+ * before it, something to publish at the end. Everything downstream may then assume it is walking a
+ * graph that makes sense.
+ *
+ * <p>Checked and never reordered. The order of the steps is the person's, not ours: {@code /audio
+ * /cut} takes the sound and cuts that, {@code /cut /audio} cuts the video and takes the sound of
+ * each piece, and those are different jobs. A graph that arrives out of order is a graph somebody
+ * wrote down wrong, and quietly rearranging it would answer a question nobody asked.
+ *
+ * <p>Which is also what makes the cycle check free rather than lost. If every node must stand after
+ * its own inputs, a loop cannot be expressed at all — "a before b" and "b before a" is not a list —
+ * so one linear pass answers what a depth-first walk with two sets used to.
  */
 public record Graph(List<Node> nodes) {
 
@@ -37,22 +42,35 @@ public record Graph(List<Node> nodes) {
                 throw new IllegalArgumentException("two nodes share the id " + node.id());
             }
         }
+        // One pass, in the order the steps were written. A node may only take its input from one
+        // already behind it, which is three checks at once: the input exists, it is not this node's
+        // own descendant, and the list runs the way it reads.
+        Set<String> behind = new HashSet<>();
         for (Node node : nodes) {
             for (String input : node.inputs()) {
-                if (!ids.contains(input)) {
-                    throw new IllegalArgumentException(
-                            node.id() + " takes its input from " + input + ", which is not here");
+                if (behind.contains(input)) {
+                    continue;
                 }
+                throw new IllegalArgumentException(ids.contains(input)
+                        ? node.id() + " takes its input from " + input + ", which does not come "
+                                + "before it — the steps either loop or are written out of order"
+                        : node.id() + " takes its input from " + input + ", which is not here");
             }
+            behind.add(node.id());
         }
         if (nodes.stream().noneMatch(node -> node instanceof Node.Publish)) {
             throw new IllegalArgumentException("a job with nothing to publish would produce nothing");
         }
-        order(nodes);
     }
 
+    /**
+     * The steps in the order they run, which is the order they were written in.
+     *
+     * <p>Kept as its own name because that is what the callers mean by it, and because it is the
+     * one guarantee this class makes about the list beyond its contents.
+     */
     public List<Node> inOrder() {
-        return order(nodes);
+        return nodes;
     }
 
     public List<Node.Publish> outputs() {
@@ -85,34 +103,5 @@ public record Graph(List<Node> nodes) {
                 .toList();
         int results = outputs().size();
         return String.join(", then ", steps) + (results > 1 ? " — " + results + " files" : "");
-    }
-
-    private static List<Node> order(List<Node> nodes) {
-        Map<String, Node> byId = new LinkedHashMap<>();
-        nodes.forEach(node -> byId.put(node.id(), node));
-
-        List<Node> sorted = new ArrayList<>(nodes.size());
-        Set<String> done = new LinkedHashSet<>();
-        Set<String> onPath = new LinkedHashSet<>();
-        for (Node node : nodes) {
-            visit(node, byId, done, onPath, sorted);
-        }
-        return List.copyOf(sorted);
-    }
-
-    private static void visit(Node node, Map<String, Node> byId, Set<String> done,
-                              Set<String> onPath, List<Node> sorted) {
-        if (done.contains(node.id())) {
-            return;
-        }
-        if (!onPath.add(node.id())) {
-            throw new IllegalArgumentException("the steps loop back on themselves at " + node.id());
-        }
-        for (String input : node.inputs()) {
-            visit(byId.get(input), byId, done, onPath, sorted);
-        }
-        onPath.remove(node.id());
-        done.add(node.id());
-        sorted.add(node);
     }
 }
