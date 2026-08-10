@@ -111,7 +111,12 @@ mediabot:
     dir: ./public
     # How long a link keeps working. After this a scheduled pass marks the row EXPIRED — which is
     # when the link stops answering — and a second pass deletes the files in batches.
-    ttl-hours: ${MEDIABOT_LINK_TTL:8}
+    #
+    # An hour: long enough to open a link somebody was just sent, short enough that a disk holding
+    # video does not fill up. It is also the window in which a repeated request is answered from
+    # what is already on disk — once the link expires the job goes with it, and asking again
+    # downloads again.
+    ttl-hours: ${MEDIABOT_LINK_TTL:1}
 
   jobs:
     # Not disposable while anything is queued: this is what lets a restart say "your download
