@@ -1,6 +1,17 @@
 spring:
   main:
     banner-mode: off
+  mvc:
+    async:
+      # How long a streamed response may take. Without this the default cuts one off after about
+      # ninety seconds, mid-body: the client is left with a truncated file, asks again, gets another
+      # truncated file, and the whole thing reads as a download that hangs. Anything over roughly
+      # 450 MB on a phone hits it.
+      #
+      # An hour, because that is how long the link it is serving lives. A request still running
+      # after that is streaming something already expired, and the file it holds open is one the
+      # sweep has taken. Raise this and the link TTL together or not at all.
+      request-timeout: ${MEDIABOT_HTTP_TIMEOUT:3600000}
 
 server:
   # 8080 is taken on this machine by something else, and a bot that will not start is a worse
