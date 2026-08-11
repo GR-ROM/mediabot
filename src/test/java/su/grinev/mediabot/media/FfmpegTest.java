@@ -3,7 +3,9 @@ package su.grinev.mediabot.media;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Where the two ffmpeg jobs meet.
@@ -14,6 +16,24 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * bytes.
  */
 class FfmpegTest {
+
+    @Test
+    void everyH264ContainerSaysWhatBitDepthItWants() {
+        // Left to itself, x264 encodes ten-bit output from a ten-bit source, in the High 10 profile
+        // — which nothing Apple makes decodes, and which arrives looking like a corrupt file rather
+        // than an unsupported one.
+        for (Container container : java.util.List.of(Container.MP4, Container.MOV, Container.MKV)) {
+            String written = String.join(" ", container.videoCodec());
+            assertTrue(written.contains("-pix_fmt yuv420p"), container + ": " + written);
+            assertTrue(written.contains("-profile:v high"), container + ": " + written);
+        }
+    }
+
+    @Test
+    void theOneThatIsNotH264IsLeftAlone() {
+        // VP9 has no such trap, and forcing a pixel format on it would be cargo cult.
+        assertFalse(String.join(" ", Container.WEBM.videoCodec()).contains("pix_fmt"));
+    }
 
     @Test
     void theHeightAMergeNamedIsNotCarriedIntoTheReEncodedFile() {

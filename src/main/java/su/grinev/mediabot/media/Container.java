@@ -13,12 +13,40 @@ import java.util.Optional;
  * of a sentence refused before one is queued.
  */
 public enum Container {
-    MP4("mp4", true, List.of("-c:v", "libx264", "-preset", "veryfast"), List.of("-c:a", "aac", "-b:a", "128k")),
-    MOV("mov", true, List.of("-c:v", "libx264", "-preset", "veryfast"), List.of("-c:a", "aac", "-b:a", "128k")),
-    MKV("mkv", false, List.of("-c:v", "libx264", "-preset", "veryfast"), List.of("-c:a", "aac", "-b:a", "128k")),
+    MP4("mp4", true, Codecs.H264, Codecs.AAC),
+    MOV("mov", true, Codecs.H264, Codecs.AAC),
+    MKV("mkv", false, Codecs.H264, Codecs.AAC),
     WEBM("webm", false, List.of("-c:v", "libvpx-vp9", "-b:v", "0"), List.of("-c:a", "libopus", "-b:a", "128k"));
 
     public static final Container DEFAULT = MP4;
+
+    /**
+     * The codec arguments, in a holder because an enum constant may not refer forward to a static
+     * field of its own class.
+     */
+    private static final class Codecs {
+
+        /**
+         * H.264 as something that will actually play, rather than as whatever x264 felt like
+         * producing.
+         *
+         * <p>The two arguments after the preset are the ones that were missing. A ten-bit source
+         * gives x264 ten-bit input, and left alone it encodes ten-bit output in the High 10
+         * profile — which nothing Apple makes decodes: not the phone, not the Mac, not Quick Look.
+         * It is not a container problem and not a bitrate problem, so it arrives looking like a
+         * corrupt file rather than an unsupported one.
+         *
+         * <p>Forcing 8-bit 4:2:0 and the High profile costs nothing anybody can see, and is what
+         * every device on earth decodes in hardware.
+         */
+        static final List<String> H264 = List.of("-c:v", "libx264", "-preset", "veryfast",
+                "-pix_fmt", "yuv420p", "-profile:v", "high");
+
+        static final List<String> AAC = List.of("-c:a", "aac", "-b:a", "128k");
+
+        private Codecs() {
+        }
+    }
 
     private final String extension;
     private final boolean faststart;

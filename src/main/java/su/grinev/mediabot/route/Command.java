@@ -50,6 +50,30 @@ public enum Command {
         }
     },
 
+    /**
+     * A download an Apple device will actually open.
+     *
+     * <p>Before this, the only answer to "it will not play on my phone" was to know that
+     * {@code /download} does not re-encode at all: whatever the host served is what arrives, merged
+     * into an mp4 container. When that is HEVC, or ten-bit, or an audio codec iOS declines, the
+     * container says mp4 and nothing plays it — which reads as a broken file rather than an
+     * unsupported one.
+     *
+     * <p>So this one re-encodes rather than hoping. It is the only command that does so
+     * unconditionally, and that is the whole of its purpose: the source stops mattering.
+     */
+    IDOWNLOAD(true, false,
+            List.of("idownload", "iphone"),
+            List.of("iphone", "ipad", "for apple", "apple device"),
+            "1080p <link>", "re-encode so an Apple device will play it") {
+        @Override
+        Request build(Args args) {
+            return new Request.Fetch(JobSpec.of(args.chatId(), Pipeline.download(args.url(), null)
+                    .encode(Container.MP4, args.height(), Quality.HIGH)
+                    .build()));
+        }
+    },
+
     // Slash only, and deliberately without phrases: "smaller" already belongs to TRANSCODE, and a
     // shorthand that quietly outranked a command somebody spelled out would be a surprise.
     SMALL(true, false, List.of("small", "tiny"), List.of(),
