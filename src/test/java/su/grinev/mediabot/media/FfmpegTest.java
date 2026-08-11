@@ -18,6 +18,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FfmpegTest {
 
     @Test
+    void aHeightIsAClaimAboutTheShortSide() {
+        // Measured on a real reel: 1080x1920 asked for at 720p came out 406x720 — a third of the
+        // pixels — because the filter set the height. On a phone that arrives looking like a bad
+        // bitrate rather than like the wrong size, which is why it went unnoticed.
+        String filter = Ffmpeg.scaleShortSideTo(720);
+
+        assertTrue(filter.contains("gt(iw\\,ih)"),
+                "which side is short depends on the video: " + filter);
+        assertTrue(filter.contains("\\,"),
+                "a bare comma ends the filter halfway through the expression: " + filter);
+        assertTrue(filter.contains("720"), filter);
+        // -2 rather than -1 on the free side: H.264 wants even dimensions.
+        assertTrue(filter.contains("-2"), filter);
+    }
+
+    @Test
+    void theNamingAndTheScalingAgreeAboutWhatAHeightMeans() {
+        // The filename already called a 1080x1920 video 1080p rather than 1920p. The scaling now
+        // says the same thing, and a test says so because the two live in different classes.
+        MediaInfo.Format portrait = new MediaInfo.Format("v", "mp4", 1080, 1920, 30, 0, "avc1", "none");
+
+        assertEquals(1080, portrait.shortSide());
+        assertTrue(Ffmpeg.scaleShortSideTo(portrait.shortSide()).contains("1080"));
+    }
+
+    @Test
     void everyH264ContainerSaysWhatBitDepthItWants() {
         // Left to itself, x264 encodes ten-bit output from a ten-bit source, in the High 10 profile
         // — which nothing Apple makes decodes, and which arrives looking like a corrupt file rather

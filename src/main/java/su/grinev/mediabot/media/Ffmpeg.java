@@ -28,6 +28,28 @@ import java.util.regex.Pattern;
 public class Ffmpeg {
 
     /** {@code out_time_ms=12345678} in the -progress stream. Microseconds, despite the name. */
+    /**
+     * Scales so that the short side becomes {@code height}, whichever side that is.
+     *
+     * <p>"720p" is a claim about the short side. Scaling the height instead is right for a
+     * landscape video and wrong for every phone recording: a 1080x1920 reel asked for at 720p came
+     * out 406x720, a third of the pixels, which arrives looking like a bad bitrate rather than like
+     * the wrong size. The naming already knew this — a vertical video is called 1080p, not 1920p —
+     * and the scaling did not.
+     *
+     * <p>-2 rather than -1 on the free side: H.264 wants even dimensions, and an odd source
+     * produces one otherwise.
+     */
+    static String scaleShortSideTo(int height) {
+        // The commas are escaped because a comma separates filters in a filtergraph, so an
+        // unescaped one inside if() ends the scale filter halfway through an expression. ffmpeg
+        // answers that with "Error opening output files: Invalid argument", which names neither the
+        // filter nor the comma.
+        String landscape = "gt(iw\\,ih)";
+        return "scale=w=if(%s\\,-2\\,%d):h=if(%s\\,%d\\,-2)"
+                .formatted(landscape, height, landscape, height);
+    }
+
     private static final Pattern OUT_TIME = Pattern.compile("out_time_ms=(\\d+)");
 
     private final Path binary;
@@ -132,8 +154,7 @@ public class Ffmpeg {
                 "-y",
                 "-i", source.toString()));
         if (height != null) {
-            // -2 keeps the width even, which H.264 requires and an odd source height produces.
-            command.addAll(List.of("-vf", "scale=-2:" + height));
+            command.addAll(List.of("-vf", scaleShortSideTo(height)));
         }
         command.addAll(codecsFor(container, quality));
         if (container.wantsFaststart()) {
@@ -243,7 +264,7 @@ public class Ffmpeg {
             command.addAll(List.of("-t", String.valueOf(window.durationSeconds())));
         }
         if (height != null) {
-            command.addAll(List.of("-vf", "scale=-2:" + height));
+            command.addAll(List.of("-vf", scaleShortSideTo(height)));
         }
         command.addAll(codecsFor(container, quality));
         if (container.wantsFaststart()) {
