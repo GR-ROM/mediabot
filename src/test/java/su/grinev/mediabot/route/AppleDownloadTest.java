@@ -5,6 +5,7 @@ import su.grinev.mediabot.graph.Node;
 import su.grinev.mediabot.jobs.JobKind;
 import su.grinev.mediabot.jobs.JobSpec;
 import su.grinev.mediabot.media.Container;
+import su.grinev.mediabot.media.Quality;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,9 +49,17 @@ class AppleDownloadTest {
     }
 
     @Test
-    void itAimsAtWhatAPhoneScreenIs() {
-        assertEquals(1080, encodeOf(fetch("/idownload " + URL)).height(),
-                "the profile brings 1080p, which is a phone");
+    void itAimsAtWhatEverythingElseAimsAt() {
+        // 720p, because that is what the rest of the bot means by a default: the guest ceiling, the
+        // standard profile and a transcode with no height all say it. Picking 1080 here would also
+        // have been invisible to a guest, whose ceiling caps it straight back to 720.
+        assertEquals(720, encodeOf(fetch("/idownload " + URL)).height());
+        assertEquals(Quality.DEFAULT, encodeOf(fetch("/idownload " + URL)).quality());
+    }
+
+    @Test
+    void moreThanTheDefaultIsStillOneWordAway() {
+        assertEquals(1080, encodeOf(fetch("/idownload 1080p " + URL)).height());
     }
 
     @Test

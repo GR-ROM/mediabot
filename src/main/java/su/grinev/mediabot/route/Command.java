@@ -65,11 +65,11 @@ public enum Command {
     IDOWNLOAD(true, false,
             List.of("idownload", "iphone"),
             List.of("iphone", "ipad", "for apple", "apple device"),
-            "1080p <link>", "re-encode so an Apple device will play it") {
+            "720p <link>", "re-encode so an Apple device will play it") {
         @Override
         Request build(Args args) {
             return new Request.Fetch(JobSpec.of(args.chatId(), Pipeline.download(args.url(), null)
-                    .encode(Container.MP4, args.height(), Quality.HIGH)
+                    .encode(Container.MP4, args.height(), Quality.DEFAULT)
                     .build()));
         }
     },
