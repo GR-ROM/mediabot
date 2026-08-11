@@ -46,8 +46,12 @@ public class Ffmpeg {
         // answers that with "Error opening output files: Invalid argument", which names neither the
         // filter nor the comma.
         String landscape = "gt(iw\\,ih)";
-        return "scale=w=if(%s\\,-2\\,%d):h=if(%s\\,%d\\,-2)"
-                .formatted(landscape, height, landscape, height);
+        // min() so a source smaller than the target is left alone. Without it a 480x854 clip asked
+        // for at 720p is stretched to 720x1282: more bytes, more CPU, and a blurrier picture than
+        // the one that arrived.
+        String wanted = "min(%d\\,if(%s\\,ih\\,iw))".formatted(height, landscape);
+        return "scale=w=if(%s\\,-2\\,%s):h=if(%s\\,%s\\,-2)"
+                .formatted(landscape, wanted, landscape, wanted);
     }
 
     private static final Pattern OUT_TIME = Pattern.compile("out_time_ms=(\\d+)");

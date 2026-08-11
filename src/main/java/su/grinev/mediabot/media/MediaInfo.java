@@ -64,20 +64,33 @@ public record MediaInfo(String title, String uploader, int durationSeconds, bool
         }
     }
 
-    /** The tallest video this host will serve, which is the ceiling on any request. */
+    /**
+     * The largest this host will serve, measured the way a person asks for it.
+     *
+     * <p>The short side, not the frame height. "1080p" is a claim about the short side — a phone
+     * recording is 1080x1920 and nobody calls it 1920p — and this number is compared against what
+     * somebody typed. Measured as the frame height it made a vertical video look taller than it is,
+     * so asking for 1440p of a 1080-wide reel passed the upscale check and produced a stretched
+     * file instead of a refusal.
+     */
     public int maxHeight() {
         return formats.stream()
                 .filter(Format::hasVideo)
-                .mapToInt(Format::height)
+                .mapToInt(Format::shortSide)
                 .max()
                 .orElse(0);
     }
 
-    /** The distinct heights on offer, tallest first, for telling somebody what they can have. */
+    /**
+     * The distinct sizes on offer, largest first, for telling somebody what they can have.
+     *
+     * <p>Short sides, so the refusal quotes the numbers a person would have typed rather than the
+     * frame heights of a vertical video.
+     */
     public List<Integer> heights() {
         return formats.stream()
                 .filter(Format::hasVideo)
-                .map(Format::height)
+                .map(Format::shortSide)
                 .filter(h -> h > 0)
                 .distinct()
                 .sorted((a, b) -> Integer.compare(b, a))
@@ -99,8 +112,8 @@ public record MediaInfo(String title, String uploader, int durationSeconds, bool
     public Integer sourceHeightFor(int targetHeight) {
         return formats.stream()
                 .filter(Format::hasVideo)
-                .mapToInt(Format::height)
-                .filter(height -> height >= targetHeight)
+                .mapToInt(Format::shortSide)
+                .filter(shortSide -> shortSide >= targetHeight)
                 .min()
                 .orElseGet(this::maxHeight);
     }
@@ -112,7 +125,9 @@ public record MediaInfo(String title, String uploader, int durationSeconds, bool
     public Optional<Format> pickVideo(Integer maxHeight, Purpose purpose) {
         return formats.stream()
                 .filter(f -> f.hasVideo() && !f.hasAudio() && f.height() > 0)
-                .filter(f -> maxHeight == null || f.height() <= maxHeight)
+                // Compared on the short side, because that is what the number means: a ceiling of
+                // 720 on a vertical video has to allow 720x1280, not cut it to 405x720.
+                .filter(f -> maxHeight == null || f.shortSide() <= maxHeight)
                 .max(byVideoQuality(purpose));
     }
 
@@ -130,7 +145,7 @@ public record MediaInfo(String title, String uploader, int durationSeconds, bool
     public Optional<Format> pickProgressive(Integer maxHeight, Purpose purpose) {
         return formats.stream()
                 .filter(f -> f.hasVideo() && f.hasAudio())
-                .filter(f -> maxHeight == null || f.height() == 0 || f.height() <= maxHeight)
+                .filter(f -> maxHeight == null || f.height() == 0 || f.shortSide() <= maxHeight)
                 .max(byVideoQuality(purpose));
     }
 
